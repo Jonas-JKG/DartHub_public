@@ -1,0 +1,17 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+import {beforeEach,it,expect,vi} from 'vitest';
+const m=vi.hoisted(()=>({run:vi.fn(),options:null as any,queued:false,moving:false,active:false}));
+vi.mock('../src/client/vision/model',()=>({loadModel:async()=>({run:m.run,accelerator:'wasm'}),unloadModel:async()=>{}}));
+vi.mock('../src/client/vision/camera',()=>({createCamera:()=>({get active(){return m.active;},start:async()=>{m.active=true;return {label:'Test',settings:{}};},stop:()=>{m.active=false;},storedZoom:()=>null}),listCameras:async()=>[],preferredCamera:()=>null}));
+vi.mock('../src/client/vision/motion',()=>({createMotionDetector:(options:any)=>{m.options=options;return {arm:()=>{},reset:()=>{m.queued=false;},setForceCpu:()=>{},queueTriggerIfArmed:()=>{m.queued=true;},flushQueuedTrigger:()=>{if(m.queued&&!m.moving&&!options.isTriggerBusy()){m.queued=false;options.onTrigger();}}};}}));
+vi.mock('../src/client/vision/postprocess',()=>({postprocess:()=>[[]]}));
+vi.mock('../src/client/vision/predictionPipeline',()=>({processPredictions:()=>({tips:[],homography:[[1,0,0],[0,1,0],[0,0,1]]})}));
+vi.mock('../src/client/vision/stillCapture',()=>({createVideoDestinationCache:()=>({reset:()=>{}}),frameGeometry:()=>({crop:{cropX:0,cropY:0,cropSize:1}}),captureCrop:async()=>null}));
+vi.mock('../src/client/vision/videoCamera',()=>({createVirtualCamera:()=>({reset:()=>{}}),releaseCanvas:()=>{}}));
+vi.mock('../src/client/vision/boardMask',()=>({createBoardMask:()=>({reset:()=>{}})}));
+import {createVisionRuntime} from '../src/client/vision/visionRuntime';
+const report=(dot:string)=>{m.moving=dot==='pending'||dot==='pendingLarge';m.options.onReport({dot});};
+beforeEach(()=>{m.run.mockReset().mockResolvedValue({outputs:[[],[]],preprocessMode:'cpu'});m.queued=false;m.moving=false;m.active=false;});
+it('discards an in-flight hand frame and retains the settled-scene trigger that arrived while busy',async()=>{const onFrame=vi.fn(),onTips=vi.fn(),runtime=createVisionRuntime({video:{} as HTMLVideoElement,onFrame,onTips});await runtime.start('back');let finish!:(r:any)=>void;m.run.mockImplementationOnce(()=>new Promise(r=>{finish=r;}));const old=runtime.infer();await vi.waitFor(()=>expect(m.run).toHaveBeenCalledTimes(1));report('pendingLarge');report('triggered');m.options.onTrigger();finish({outputs:[[],[]],preprocessMode:'cpu'});await old;await vi.waitFor(()=>expect(onFrame).toHaveBeenCalledTimes(1));expect(m.run).toHaveBeenCalledTimes(2);expect(onTips).toHaveBeenCalledTimes(1);await runtime.stop();});
+it('waits for motion to settle before a requested confirmation and never evaluates the moving hand',async()=>{const onFrame=vi.fn(),runtime=createVisionRuntime({video:{} as HTMLVideoElement,onFrame,onTips:()=>{}});await runtime.start('back');report('pendingLarge');await runtime.infer();expect(m.run).not.toHaveBeenCalled();expect(m.queued).toBe(true);report('triggered');runtime.motion.flushQueuedTrigger();await vi.waitFor(()=>expect(onFrame).toHaveBeenCalledTimes(1));await runtime.stop();});
+it('does not publish a model result from a camera session stopped during inference',async()=>{const onFrame=vi.fn(),runtime=createVisionRuntime({video:{} as HTMLVideoElement,onFrame,onTips:()=>{}});await runtime.start('back');let finish!:(r:any)=>void;m.run.mockImplementationOnce(()=>new Promise(r=>{finish=r;}));const running=runtime.infer();await vi.waitFor(()=>expect(m.run).toHaveBeenCalled());await runtime.stop();finish({outputs:[[],[]],preprocessMode:'cpu'});await running;expect(onFrame).not.toHaveBeenCalled();});

@@ -1,0 +1,6 @@
+let clock:{offset:number;error:number;at:number}|undefined;
+export function cameraClock(){return clock;}
+export async function cameraRequest(body?:unknown,device?:string){const started=performance.now(),sent=Date.now();const r=await fetch('/api/camera'+(device?'?device='+encodeURIComponent(device):''),{method:body?'POST':'GET',cache:'no-store',headers:body?{'Content-Type':'application/json'}:{},...(body?{body:JSON.stringify(body)}:{}),signal:AbortSignal.timeout(10000)});const d=await r.json(),received=Date.now(),requestMs=performance.now()-started;if(!r.ok)throw Object.assign(Error(d.error??'Kameraverbindung fehlgeschlagen.'),{status:r.status});
+ const timing=d.clock;if(timing&&Number.isFinite(timing.received)&&Number.isFinite(timing.sent)&&timing.sent>=timing.received){const serverMs=timing.sent-timing.received,error=Math.max(0,requestMs-serverMs)/2,offset=((timing.received-sent)+(timing.sent-received))/2;if(Math.abs(received-sent-requestMs)<1000&&(!clock||error<clock.error||performance.now()-clock.at>60000))clock={offset,error,at:performance.now()};}
+ return {...d,_timing:{requestMs,...(timing?{serverMs:Math.max(0,timing.sent-timing.received)}:{}),offset:clock?.offset,error:clock?.error}};
+}

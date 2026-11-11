@@ -1,0 +1,18 @@
+import {beforeEach,it,expect,vi} from 'vitest';
+import {NextRequest} from 'next/server';
+import {randomUUID,randomInt} from 'node:crypto';
+import {createTournament} from '../src/domain/tournament';
+const m=vi.hoisted(()=>({session:vi.fn(),get:vi.fn(),list:vi.fn(),save:vi.fn(),db:vi.fn(),rpc:vi.fn()}));
+vi.mock('../src/server/repositories/supabase',()=>({configured:()=>true,repository:{session:m.session,get:m.get,list:m.list,save:m.save},db:m.db,rpc:m.rpc,DatabaseError:class extends Error{constructor(message:string,public code:string){super(message);}}}));
+import {GET,POST} from '../src/app/api/app/route';
+import {DatabaseError} from '../src/server/repositories/supabase';
+const ma=randomUUID(),mb=randomUUID();
+const t={...createTournament({id:randomUUID(),name:'Fremdes Turnier',names:['A','B','C','D'],mode:'knockout',groupSize:4,advancePerGroup:2},randomInt,randomUUID),status:'running' as const,managerId:mb};
+const root={role:'owner',manager_id:ma,token_hash:'parent',tournament_id:null};
+const cookie='dartbracket_session=account; dartbracket_player=child';
+const req=(body:unknown)=>new NextRequest('https://example.test/api/app',{method:'POST',headers:{origin:'https://example.test',cookie},body:JSON.stringify(body)});
+beforeEach(()=>{vi.clearAllMocks();vi.stubEnv('MANAGER_AUTH_ENABLED','true');vi.stubEnv('APP_ORIGIN','https://example.test');m.session.mockImplementation(async(raw:string)=>raw==='account'?root:{role:'editor',token_hash:'child-hash',account_session_hash:'parent',manager_id:mb,participant_id:t.matches[0].players[0],participant_ids:[t.matches[0].players[0]],tournament_id:t.id});m.get.mockResolvedValue({...t,linkedParticipantIds:[t.matches[0].players[0]]});});
+it('verknüpftes fremdes Turnier gibt weder Codes noch Verwaltungsprotokoll frei',async()=>{for(const q of ['history']){const r=await GET(new NextRequest('https://example.test/api/app?id='+t.id+'&'+q+'=1',{headers:{cookie}}));expect(r.status).toBe(403);}expect(m.db).not.toHaveBeenCalled();});
+it('Codeverknüpfung gewährt keine Einstellungen, Löschung oder Codeerneuerung',async()=>{for(const action of ['rename','delete'])expect((await POST(req({action,id:t.id,expectedVersion:t.version,payload:action==='access'?{operation:'revoke'}:{name:'Übernommen'}}))).status).toBe(403);expect(m.rpc).not.toHaveBeenCalled();expect(m.save).not.toHaveBeenCalled();});
+it('Ergebnis eigener Paarung verwendet ausschließlich gebundene Spielerrechte',async()=>{const r=await POST(req({action:'score',id:t.id,expectedVersion:t.version,payload:{matchId:t.matches[0].id,result:{legs:[1,0],status:'running',forfeited:null}}}));expect(r.status).toBe(200);expect(m.save.mock.calls[0][2]).toMatchObject({role:'editor',token_hash:'child-hash'});});
+it('fremde Paarung bleibt auch mit gültigem Konto und verknüpftem Code gesperrt',async()=>{const r=await POST(req({action:'score',id:t.id,expectedVersion:t.version,payload:{matchId:t.matches[1].id,result:{legs:[1,0],status:'running',forfeited:null}}}));expect(r.status).toBe(403);expect(m.save).not.toHaveBeenCalled();});

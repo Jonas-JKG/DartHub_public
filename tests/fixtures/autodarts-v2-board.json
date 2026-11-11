@@ -1,0 +1,888 @@
+[
+  [
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.state",
+      "data": {
+        "connected": true,
+        "event": "Takeout started",
+        "numThrows": 0,
+        "status": "Takeout in progress"
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.events",
+      "data": {
+        "boardId": "recorded-board",
+        "event": "Takeout started",
+        "throw": {
+          "coords": {
+            "x": 0,
+            "y": 0
+          },
+          "segment": {
+            "bed": "Outside",
+            "multiplier": 0,
+            "name": "Miss",
+            "number": 0
+          }
+        }
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.state",
+      "data": {
+        "connected": true,
+        "event": "Calibration started",
+        "numThrows": 0,
+        "status": "Calibrating"
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.events",
+      "data": {
+        "boardId": "recorded-board",
+        "event": "Calibration started",
+        "throw": {
+          "coords": {
+            "x": 0,
+            "y": 0
+          },
+          "segment": {
+            "bed": "Outside",
+            "multiplier": 0,
+            "name": "Miss",
+            "number": 0
+          }
+        }
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.state",
+      "data": {
+        "connected": true,
+        "event": "Calibration finished",
+        "numThrows": 0,
+        "status": "Throw"
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.events",
+      "data": {
+        "boardId": "recorded-board",
+        "event": "Calibration finished",
+        "throw": {
+          "coords": {
+            "x": 0,
+            "y": 0
+          },
+          "segment": {
+            "bed": "Outside",
+            "multiplier": 0,
+            "name": "Miss",
+            "number": 0
+          }
+        }
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.events",
+      "data": {
+        "boardId": "recorded-board",
+        "event": "Takeout started",
+        "throw": {
+          "coords": {
+            "x": 0,
+            "y": 0
+          },
+          "segment": {
+            "bed": "Outside",
+            "multiplier": 0,
+            "name": "Miss",
+            "number": 0
+          }
+        }
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.state",
+      "data": {
+        "connected": true,
+        "event": "Takeout started",
+        "numThrows": 0,
+        "status": "Takeout in progress"
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.state",
+      "data": {
+        "connected": true,
+        "event": "Manual reset",
+        "numThrows": 0,
+        "status": "Throw"
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.events",
+      "data": {
+        "boardId": "recorded-board",
+        "event": "Manual reset",
+        "throw": {
+          "coords": {
+            "x": 0,
+            "y": 0
+          },
+          "segment": {
+            "bed": "Outside",
+            "multiplier": 0,
+            "name": "Miss",
+            "number": 0
+          }
+        }
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.state",
+      "data": {
+        "connected": true,
+        "event": "Manual reset",
+        "numThrows": 0,
+        "status": "Throw"
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.events",
+      "data": {
+        "boardId": "recorded-board",
+        "event": "Manual reset",
+        "throw": {
+          "coords": {
+            "x": 0,
+            "y": 0
+          },
+          "segment": {
+            "bed": "Outside",
+            "multiplier": 0,
+            "name": "Miss",
+            "number": 0
+          }
+        }
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.state",
+      "data": {
+        "connected": true,
+        "event": "Throw detected",
+        "numThrows": 1,
+        "status": "Throw"
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.events",
+      "data": {
+        "boardId": "recorded-board",
+        "event": "Throw detected",
+        "throw": {
+          "coords": {
+            "x": 0.3055217153158699,
+            "y": -0.06434386204181908
+          },
+          "segment": {
+            "bed": "SingleInner",
+            "multiplier": 1,
+            "name": "S10",
+            "number": 10
+          }
+        },
+        "throwNumber": 1
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.state",
+      "data": {
+        "connected": true,
+        "event": "Throw detected",
+        "numThrows": 2,
+        "status": "Throw"
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.events",
+      "data": {
+        "boardId": "recorded-board",
+        "event": "Throw detected",
+        "throw": {
+          "coords": {
+            "x": 0.40895545130882116,
+            "y": 0.17021067932624956
+          },
+          "segment": {
+            "bed": "SingleInner",
+            "multiplier": 1,
+            "name": "S13",
+            "number": 13
+          }
+        },
+        "throwNumber": 2
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.state",
+      "data": {
+        "connected": true,
+        "event": "Throw detected",
+        "numThrows": 3,
+        "status": "Takeout"
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.events",
+      "data": {
+        "boardId": "recorded-board",
+        "event": "Throw detected",
+        "throw": {
+          "coords": {
+            "x": -0.09736203598010129,
+            "y": 0.2939345379227223
+          },
+          "segment": {
+            "bed": "SingleInner",
+            "multiplier": 1,
+            "name": "S5",
+            "number": 5
+          }
+        },
+        "throwNumber": 3
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.state",
+      "data": {
+        "connected": true,
+        "event": "Takeout started",
+        "numThrows": 0,
+        "status": "Takeout in progress"
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.events",
+      "data": {
+        "boardId": "recorded-board",
+        "event": "Takeout started",
+        "throw": {
+          "coords": {
+            "x": 0,
+            "y": 0
+          },
+          "segment": {
+            "bed": "Outside",
+            "multiplier": 0,
+            "name": "Miss",
+            "number": 0
+          }
+        }
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.state",
+      "data": {
+        "connected": true,
+        "event": "Takeout finished",
+        "numThrows": 0,
+        "status": "Throw"
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.events",
+      "data": {
+        "boardId": "recorded-board",
+        "event": "Takeout finished",
+        "throw": {
+          "coords": {
+            "x": 0,
+            "y": 0
+          },
+          "segment": {
+            "bed": "Outside",
+            "multiplier": 0,
+            "name": "Miss",
+            "number": 0
+          }
+        }
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.state",
+      "data": {
+        "connected": true,
+        "event": "Throw detected",
+        "numThrows": 1,
+        "status": "Throw"
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.events",
+      "data": {
+        "boardId": "recorded-board",
+        "event": "Throw detected",
+        "throw": {
+          "coords": {
+            "x": 0.1486643209882681,
+            "y": -0.22735094176137088
+          },
+          "segment": {
+            "bed": "SingleInner",
+            "multiplier": 1,
+            "name": "S2",
+            "number": 2
+          }
+        },
+        "throwNumber": 1
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.state",
+      "data": {
+        "connected": true,
+        "event": "Throw detected",
+        "numThrows": 2,
+        "status": "Throw"
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.events",
+      "data": {
+        "boardId": "recorded-board",
+        "event": "Throw detected",
+        "throw": {
+          "coords": {
+            "x": 0.16985453209900991,
+            "y": 0.3768252621239072
+          },
+          "segment": {
+            "bed": "SingleInner",
+            "multiplier": 1,
+            "name": "S1",
+            "number": 1
+          }
+        },
+        "throwNumber": 2
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.state",
+      "data": {
+        "connected": true,
+        "event": "Throw detected",
+        "numThrows": 3,
+        "status": "Takeout"
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.events",
+      "data": {
+        "boardId": "recorded-board",
+        "event": "Throw detected",
+        "throw": {
+          "coords": {
+            "x": -0.2405046711770653,
+            "y": 0.14043530972406004
+          },
+          "segment": {
+            "bed": "SingleInner",
+            "multiplier": 1,
+            "name": "S9",
+            "number": 9
+          }
+        },
+        "throwNumber": 3
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.state",
+      "data": {
+        "connected": true,
+        "event": "Takeout started",
+        "numThrows": 0,
+        "status": "Takeout in progress"
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.events",
+      "data": {
+        "boardId": "recorded-board",
+        "event": "Takeout started",
+        "throw": {
+          "coords": {
+            "x": 0,
+            "y": 0
+          },
+          "segment": {
+            "bed": "Outside",
+            "multiplier": 0,
+            "name": "Miss",
+            "number": 0
+          }
+        }
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.state",
+      "data": {
+        "connected": true,
+        "event": "Takeout finished",
+        "numThrows": 0,
+        "status": "Throw"
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.events",
+      "data": {
+        "boardId": "recorded-board",
+        "event": "Takeout finished",
+        "throw": {
+          "coords": {
+            "x": 0,
+            "y": 0
+          },
+          "segment": {
+            "bed": "Outside",
+            "multiplier": 0,
+            "name": "Miss",
+            "number": 0
+          }
+        }
+      }
+    }
+  ],
+  [
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.state",
+      "data": {
+        "connected": true,
+        "event": "Manual reset",
+        "numThrows": 0,
+        "status": "Throw"
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.events",
+      "data": {
+        "boardId": "recorded-board",
+        "event": "Manual reset",
+        "throw": {
+          "coords": {
+            "x": 0,
+            "y": 0
+          },
+          "segment": {
+            "bed": "Outside",
+            "multiplier": 0,
+            "name": "Miss",
+            "number": 0
+          }
+        }
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.state",
+      "data": {
+        "connected": true,
+        "event": "Throw detected",
+        "numThrows": 1,
+        "status": "Throw"
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.events",
+      "data": {
+        "boardId": "recorded-board",
+        "event": "Throw detected",
+        "throw": {
+          "coords": {
+            "x": 0.013382938235371178,
+            "y": 0.4915364114515416
+          },
+          "segment": {
+            "bed": "SingleInner",
+            "multiplier": 1,
+            "name": "S20",
+            "number": 20
+          }
+        },
+        "throwNumber": 1
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.state",
+      "data": {
+        "connected": true,
+        "event": "Throw detected",
+        "numThrows": 2,
+        "status": "Throw"
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.events",
+      "data": {
+        "boardId": "recorded-board",
+        "event": "Throw detected",
+        "throw": {
+          "coords": {
+            "x": -0.0340296985044678,
+            "y": 0.49233708066232595
+          },
+          "segment": {
+            "bed": "SingleInner",
+            "multiplier": 1,
+            "name": "S20",
+            "number": 20
+          }
+        },
+        "throwNumber": 2
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.state",
+      "data": {
+        "connected": true,
+        "event": "Throw detected",
+        "numThrows": 3,
+        "status": "Takeout"
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.events",
+      "data": {
+        "boardId": "recorded-board",
+        "event": "Throw detected",
+        "throw": {
+          "coords": {
+            "x": 0.02972402730862278,
+            "y": 0.4792409942441702
+          },
+          "segment": {
+            "bed": "SingleInner",
+            "multiplier": 1,
+            "name": "S20",
+            "number": 20
+          }
+        },
+        "throwNumber": 3
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.state",
+      "data": {
+        "connected": true,
+        "event": "Takeout started",
+        "numThrows": 0,
+        "status": "Takeout in progress"
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.events",
+      "data": {
+        "boardId": "recorded-board",
+        "event": "Takeout started",
+        "throw": {
+          "coords": {
+            "x": 0,
+            "y": 0
+          },
+          "segment": {
+            "bed": "Outside",
+            "multiplier": 0,
+            "name": "Miss",
+            "number": 0
+          }
+        }
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.state",
+      "data": {
+        "connected": true,
+        "event": "Takeout finished",
+        "numThrows": 0,
+        "status": "Throw"
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.events",
+      "data": {
+        "boardId": "recorded-board",
+        "event": "Takeout finished",
+        "throw": {
+          "coords": {
+            "x": 0,
+            "y": 0
+          },
+          "segment": {
+            "bed": "Outside",
+            "multiplier": 0,
+            "name": "Miss",
+            "number": 0
+          }
+        }
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.state",
+      "data": {
+        "connected": true,
+        "event": "Manual reset",
+        "numThrows": 0,
+        "status": "Throw"
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.events",
+      "data": {
+        "boardId": "recorded-board",
+        "event": "Manual reset",
+        "throw": {
+          "coords": {
+            "x": 0,
+            "y": 0
+          },
+          "segment": {
+            "bed": "Outside",
+            "multiplier": 0,
+            "name": "Miss",
+            "number": 0
+          }
+        }
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.state",
+      "data": {
+        "connected": true,
+        "event": "Throw detected",
+        "numThrows": 1,
+        "status": "Throw"
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.events",
+      "data": {
+        "boardId": "recorded-board",
+        "event": "Throw detected",
+        "throw": {
+          "coords": {
+            "x": 0.030010004716312766,
+            "y": 0.6703426271549922
+          },
+          "segment": {
+            "bed": "SingleOuter",
+            "multiplier": 1,
+            "name": "S20",
+            "number": 20
+          }
+        },
+        "throwNumber": 1
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.state",
+      "data": {
+        "connected": true,
+        "event": "Throw detected",
+        "numThrows": 2,
+        "status": "Throw"
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.events",
+      "data": {
+        "boardId": "recorded-board",
+        "event": "Throw detected",
+        "throw": {
+          "coords": {
+            "x": 0.17375673616992748,
+            "y": 0.5458705214212208
+          },
+          "segment": {
+            "bed": "Triple",
+            "multiplier": 3,
+            "name": "T1",
+            "number": 1
+          }
+        },
+        "throwNumber": 2
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.state",
+      "data": {
+        "connected": true,
+        "event": "Throw detected",
+        "numThrows": 3,
+        "status": "Takeout"
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.events",
+      "data": {
+        "boardId": "recorded-board",
+        "event": "Throw detected",
+        "throw": {
+          "coords": {
+            "x": 0.14322570768599263,
+            "y": 0.6447567881307603
+          },
+          "segment": {
+            "bed": "SingleOuter",
+            "multiplier": 1,
+            "name": "S1",
+            "number": 1
+          }
+        },
+        "throwNumber": 3
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.state",
+      "data": {
+        "connected": true,
+        "event": "Takeout started",
+        "numThrows": 0,
+        "status": "Takeout in progress"
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.events",
+      "data": {
+        "boardId": "recorded-board",
+        "event": "Takeout started",
+        "throw": {
+          "coords": {
+            "x": 0,
+            "y": 0
+          },
+          "segment": {
+            "bed": "Outside",
+            "multiplier": 0,
+            "name": "Miss",
+            "number": 0
+          }
+        }
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.state",
+      "data": {
+        "connected": true,
+        "event": "Takeout finished",
+        "numThrows": 0,
+        "status": "Throw"
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.events",
+      "data": {
+        "boardId": "recorded-board",
+        "event": "Takeout finished",
+        "throw": {
+          "coords": {
+            "x": 0,
+            "y": 0
+          },
+          "segment": {
+            "bed": "Outside",
+            "multiplier": 0,
+            "name": "Miss",
+            "number": 0
+          }
+        }
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.events",
+      "data": {
+        "boardId": "recorded-board",
+        "event": "Manual reset",
+        "throw": {
+          "coords": {
+            "x": 0,
+            "y": 0
+          },
+          "segment": {
+            "bed": "Outside",
+            "multiplier": 0,
+            "name": "Miss",
+            "number": 0
+          }
+        }
+      }
+    },
+    {
+      "channel": "autodarts.boards",
+      "topic": "recorded-board.state",
+      "data": {
+        "connected": true,
+        "event": "Manual reset",
+        "numThrows": 0,
+        "status": "Throw"
+      }
+    }
+  ]
+]

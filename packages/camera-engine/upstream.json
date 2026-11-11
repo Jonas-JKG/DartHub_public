@@ -1,0 +1,12 @@
+{
+  "repository": "https://github.com/Instadarts/instadarts",
+  "commit": "a455d7f8c5c7df2b37f7d08fefac970ec9e74ea0",
+  "models": {
+    "s_960.tflite": "8bc56422c81db6ae7e929b9624648bda0e1ba4a5738de2cabfbe921cc80faca6",
+    "s_1280.tflite": "fbda0a67a728b8f7a7aea605238a7bd9713d3a466ad0400fe620f8fad74f3983"
+  },
+  "reference": {
+    "board-three-darts.jpg": "bc0a171566e00e77f86ac7ae20e5230302ce639a9083339b1691deea4939dfd3",
+    "board-empty.jpg": "6de0571f3c39365fc2292359d1a8d85088365b55267f7e4eead463ba49a96d62"
+  }
+}

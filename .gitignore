@@ -1,0 +1,30 @@
+node_modules
+.next/
+.env*
+!.env.example
+coverage/
+*.tsbuildinfo
+.vercel/
+playwright-report/
+test-results/
+
+/Caller/
+
+# Local Autodarts diagnostic recordings
+/diagnostics/
+
+/tools/autodarts/recordings/
+
+/public/camera-engine/
+/packages/camera-engine/.cache/
+/test-results-camera/
+
+# Private audio packs and local credentials must never enter the public export.
+/public/audio/caller/
+/public/audio/walk-on/*
+!/public/audio/walk-on/intro.mp3
+*.pem
+*.p12
+*.key
+*.sqlite
+*.sqlite3

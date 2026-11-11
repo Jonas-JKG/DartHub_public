@@ -1,0 +1,5 @@
+Camera inference runtime: LiteRT.js (@litertjs/core 2.5.3), Copyright Google LLC, Apache License 2.0.
+https://github.com/google-ai-edge/LiteRT.js
+Includes TensorFlow Lite/XNNPACK runtime components. Original source headers in distributed WASM loader files are retained. The complete Apache-2.0 text is provided in APACHE-2.0.txt. npm dependency integrity and versions are recorded in package-lock.json.
+
+Camera/model/geometry program: InstaDarts, pinned in upstream.json, AGPL-3.0-only. Original model weights and reference images are covered by upstream's license. The source archive includes modified source and model weights; upstream source and copyright notices are retained. See LICENSE and README.md.

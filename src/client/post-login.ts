@@ -1,0 +1,3 @@
+const valid=(value:string|null)=>!!value&&(value==='/'||/^\/(?:settings|friends|account\/setup|training(?:\/[a-f0-9-]{36}(?:\/games\/[A-Za-z0-9_-]+)?)?|tournaments\/[a-f0-9-]{36}(?:\/games\/[A-Za-z0-9_-]+)?|watch\/[A-Za-z0-9_-]{30,100})$/.test(value));
+export function rememberLoginDestination(){try{const next=new URLSearchParams(window.location.search).get('next');if(valid(next))localStorage.setItem('after-account-login',next!);}catch{}}
+export function loginDestination(fallback:string){try{const next=new URLSearchParams(window.location.search).get('next')??localStorage.getItem('after-account-login');localStorage.removeItem('after-account-login');return valid(next)?next!:fallback;}catch{return fallback;}}

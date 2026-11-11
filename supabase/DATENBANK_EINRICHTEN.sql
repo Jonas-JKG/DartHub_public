@@ -1,0 +1,576 @@
+-- Vollständige, wiederholbare Einrichtung. Bestehende Turnierdaten werden erhalten.
+-- Execute the entire migration in Supabase SQL Editor. No application secrets here.
+begin;
+create table if not exists public.tournaments (
+  id uuid primary key, state jsonb not null, version integer not null check(version > 0),
+  status text not null check(status in ('planned','running','completed','archived')),
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now(),
+  check(jsonb_typeof(state->'participants')='array'),
+  check(jsonb_array_length(state->'participants') between 3 and 20),
+  check(state->>'id'=id::text)
+);
+create table if not exists public.players (id uuid primary key, name text not null check(length(name) between 1 and 80));
+create table if not exists public.tournament_participants (
+  tournament_id uuid references public.tournaments on delete cascade,
+  id uuid references public.players, name text not null, position integer not null,
+  primary key(tournament_id,id), unique(tournament_id,position)
+);
+create table if not exists public.groups (
+  tournament_id uuid references public.tournaments on delete cascade, id text not null,
+  name text not null, primary key(tournament_id,id)
+);
+create table if not exists public.group_memberships (
+  tournament_id uuid not null, group_id text not null, participant_id uuid not null,
+  primary key(tournament_id,participant_id),
+  foreign key(tournament_id,group_id) references public.groups on delete cascade,
+  foreign key(tournament_id,participant_id) references public.tournament_participants on delete cascade
+);
+create table if not exists public.knockout_rounds (
+  tournament_id uuid references public.tournaments on delete cascade, number integer check(number>0),
+  primary key(tournament_id,number)
+);
+create table if not exists public.group_qualifications (
+  tournament_id uuid not null, group_id text not null, rank integer not null check(rank>0), participant_id uuid not null,
+  primary key(tournament_id,group_id,rank), unique(tournament_id,participant_id),
+  foreign key(tournament_id,group_id) references public.groups on delete cascade,
+  foreign key(tournament_id,participant_id) references public.tournament_participants on delete cascade
+);
+create table if not exists public.matches (
+  tournament_id uuid references public.tournaments on delete cascade, id text not null,
+  phase text not null check(phase in ('group','knockout')), group_id text, round_number integer,
+  position integer not null, status text not null check(status in ('pending','running','finished')),
+  automatic boolean not null, player_a uuid, player_b uuid,
+  primary key(tournament_id,id),
+  foreign key(tournament_id,group_id) references public.groups,
+  foreign key(tournament_id,round_number) references public.knockout_rounds,
+  foreign key(tournament_id,player_a) references public.tournament_participants,
+  foreign key(tournament_id,player_b) references public.tournament_participants,
+  check(player_a is null or player_b is null or player_a<>player_b),
+  check((phase='group' and group_id is not null and round_number is null) or (phase='knockout' and group_id is null and round_number is not null)),
+  check(status='pending' or automatic or (player_a is not null and player_b is not null))
+);
+create table if not exists public.match_slots (
+  tournament_id uuid not null, match_id text not null, slot integer check(slot in (0,1)),
+  source_kind text not null check(source_kind in ('participant','winner','bye')), source_id text,
+  primary key(tournament_id,match_id,slot),
+  foreign key(tournament_id,match_id) references public.matches on delete cascade
+);
+create unique index if not exists unique_group_pair on public.matches(tournament_id,least(player_a,player_b),greatest(player_a,player_b)) where phase='group';
+create table if not exists public.match_dependencies (
+  tournament_id uuid not null, source_match text not null, target_match text not null, target_slot integer check(target_slot in (0,1)),
+  primary key(tournament_id,target_match,target_slot),
+  foreign key(tournament_id,source_match) references public.matches on delete cascade,
+  foreign key(tournament_id,target_match) references public.matches on delete cascade,
+  check(source_match<>target_match)
+);
+create table if not exists public.match_results (
+  tournament_id uuid not null, match_id text not null, legs_a integer check(legs_a between 0 and 9999), legs_b integer check(legs_b between 0 and 9999),
+  winner uuid, forfeited uuid,
+  primary key(tournament_id,match_id),
+  foreign key(tournament_id,match_id) references public.matches on delete cascade,
+  foreign key(tournament_id,winner) references public.tournament_participants,
+  foreign key(tournament_id,forfeited) references public.tournament_participants,
+  check((legs_a is null)=(legs_b is null)), check(forfeited is null or (winner is not null and winner<>forfeited))
+);
+create table if not exists public.group_ranking_decisions (
+  tournament_id uuid not null, group_id text not null, tie_key text not null, participant_order jsonb not null,
+  primary key(tournament_id,group_id,tie_key), foreign key(tournament_id,group_id) references public.groups on delete cascade
+);
+create table if not exists public.tournament_credentials (
+  tournament_id uuid primary key references public.tournaments on delete cascade,
+  admin_hash text not null, admin_version integer not null default 1,
+  editor_link_hash text not null unique, editor_pin_hash text not null, editor_secret text not null,
+  editor_enabled boolean not null default true, editor_version integer not null default 1
+);
+create table if not exists public.sessions (
+  token_hash text primary key check(token_hash ~ '^[a-f0-9]{64}$'),
+  role text not null check(role in ('owner','admin','editor')),
+  tournament_id uuid references public.tournaments on delete cascade,
+  credential_version integer not null, expires_at timestamptz not null,
+  check((role='owner' and tournament_id is null) or (role<>'owner' and tournament_id is not null))
+);
+create index if not exists sessions_expiry on public.sessions(expires_at);
+create table if not exists public.login_rate_limits (key text primary key, attempts integer not null, reset_at timestamptz not null);
+create table if not exists public.audit_events (
+  id bigint generated always as identity primary key, tournament_id uuid,
+  actor_role text not null, actor_session text not null, action text not null,
+  before_state jsonb, after_state jsonb, detail jsonb, created_at timestamptz not null default now()
+);
+create index if not exists audit_tournament on public.audit_events(tournament_id,created_at desc);
+create table if not exists public.public_tournament_snapshots (
+  id uuid primary key references public.tournaments on delete cascade, state jsonb not null,
+  archived boolean not null, version integer not null, updated_at timestamptz not null
+);
+create table if not exists public.public_live_state (
+  id integer primary key check(id=1), tournament_id uuid, version bigint not null default 0
+);
+insert into public.public_live_state(id) values(1) on conflict(id) do nothing;
+
+-- Browser roles can only read public snapshots and the live pointer.
+do $$ declare tab text; begin
+  foreach tab in array array['tournaments','players','tournament_participants','groups','group_memberships','group_qualifications','knockout_rounds','matches','match_slots','match_dependencies','match_results','group_ranking_decisions','tournament_credentials','sessions','login_rate_limits','audit_events','public_tournament_snapshots','public_live_state'] loop
+    execute format('alter table public.%I enable row level security',tab);
+    execute format('revoke all on public.%I from anon, authenticated',tab);
+    execute format('grant all on public.%I to service_role',tab);
+  end loop;
+end $$;
+grant select on public.public_tournament_snapshots,public.public_live_state to anon,authenticated;
+drop policy if exists public_snapshots_read on public.public_tournament_snapshots;
+create policy public_snapshots_read on public.public_tournament_snapshots for select to anon,authenticated using(not archived);
+drop policy if exists public_live_read on public.public_live_state;
+create policy public_live_read on public.public_live_state for select to anon,authenticated using(true);
+
+create or replace function public.read_session(p_hash text) returns jsonb language sql security definer set search_path='' as $$
+  select to_jsonb(s) from public.sessions s left join public.tournament_credentials c on c.tournament_id=s.tournament_id
+  where s.token_hash=p_hash and s.expires_at>now() and
+    (s.role='owner' or (s.role='editor' and c.editor_enabled and s.credential_version=c.editor_version));
+$$;
+create or replace function public.assert_session(p_hash text,p_id uuid,p_action text) returns jsonb language plpgsql security definer set search_path='' as $$
+declare s jsonb; begin
+  s:=public.read_session(p_hash);
+  if s is null then raise exception 'Nicht angemeldet' using errcode='28000'; end if;
+  if s->>'role'='owner' then return s; end if;
+  if s->>'tournament_id'<>p_id::text or p_id is null then raise exception 'Keine Berechtigung' using errcode='42501'; end if;
+  if s->>'role'='editor' and p_action='score' then return s; end if;
+  raise exception 'Keine Berechtigung' using errcode='42501';
+end $$;
+
+create or replace function public.sync_tournament(p_state jsonb) returns void language plpgsql security definer set search_path='' as $$
+declare tid uuid := (p_state->>'id')::uuid; p jsonb; g jsonb; m jsonb; s jsonb; d record; pos integer:=0; i integer; qpos integer:=0; qslot text; begin
+  delete from public.matches where tournament_id=tid;
+  delete from public.group_memberships where tournament_id=tid;
+  delete from public.group_qualifications where tournament_id=tid;
+  delete from public.group_ranking_decisions where tournament_id=tid;
+  delete from public.groups where tournament_id=tid;
+  delete from public.knockout_rounds where tournament_id=tid;
+  delete from public.tournament_participants where tournament_id=tid;
+  for p in select value from jsonb_array_elements(p_state->'participants') loop
+    insert into public.players(id,name) values((p->>'id')::uuid,p->>'name') on conflict(id) do update set name=excluded.name;
+    insert into public.tournament_participants values(tid,(p->>'id')::uuid,p->>'name',pos); pos:=pos+1;
+  end loop;
+  for g in select value from jsonb_array_elements(p_state->'groups') loop
+    insert into public.groups values(tid,g->>'id',g->>'name');
+    for p in select value from jsonb_array_elements(g->'participants') loop
+      insert into public.group_memberships values(tid,g->>'id',(p#>>'{}')::uuid);
+    end loop;
+    for d in select key,value from jsonb_each(g->'decisions') loop
+      insert into public.group_ranking_decisions values(tid,g->>'id',d.key,d.value);
+    end loop;
+  end loop;
+  insert into public.knockout_rounds select distinct tid,(value->>'round')::integer from jsonb_array_elements(p_state->'matches') where value->>'phase'='knockout';
+  for m in select value from jsonb_array_elements(p_state->'matches') loop
+    insert into public.matches values(tid,m->>'id',m->>'phase',m->>'groupId',case when m->>'phase'='knockout' then (m->>'round')::integer else null end,(m->>'position')::integer,m->>'status',(m->>'automatic')::boolean,(m->'players'->>0)::uuid,(m->'players'->>1)::uuid);
+    if m->>'status'='finished' then
+      if m->>'winner' is null or not (m->>'winner' is not distinct from m->'players'->>0 or m->>'winner' is not distinct from m->'players'->>1) then raise exception 'Ungültiger Gewinner'; end if;
+      if (m->>'automatic')::boolean and (m->>'phase'<>'knockout' or ((m->'players'->>0 is null)=(m->'players'->>1 is null)) or m->'legs'->>0 is not null or m->'legs'->>1 is not null) then raise exception 'Ungültiges Freilos'; end if;
+      if not (m->>'automatic')::boolean and m->>'forfeited' is null and
+        (m->'legs'->>0 is null or m->'legs'->>1 is null or (m->'legs'->>0)::integer=(m->'legs'->>1)::integer or
+        m->>'winner'<>case when (m->'legs'->>0)::integer>(m->'legs'->>1)::integer then m->'players'->>0 else m->'players'->>1 end) then raise exception 'Ungültiges Endergebnis'; end if;
+    elsif m->>'winner' is not null or m->>'forfeited' is not null then raise exception 'Offenes Match mit Gewinner'; end if;
+    if m->>'forfeited' is not null and m->>'forfeited' not in (m->'players'->>0,m->'players'->>1) then raise exception 'Ungültige Aufgabe'; end if;
+    insert into public.match_results values(tid,m->>'id',(m->'legs'->>0)::integer,(m->'legs'->>1)::integer,(m->>'winner')::uuid,(m->>'forfeited')::uuid);
+  end loop;
+  if p_state->>'mode'='groups' then
+    for m in select value from jsonb_array_elements(p_state->'matches') where value->>'phase'='knockout' and value->>'round'='1' order by (value->>'position')::integer loop
+      for s in select value from jsonb_array_elements(m->'sources') where value->>'kind'='participant' loop
+        qslot:=p_state->'knockoutSeeds'->>qpos;
+        insert into public.group_qualifications values(tid,split_part(qslot,':',1),split_part(qslot,':',2)::integer,(s->>'id')::uuid);
+        qpos:=qpos+1;
+      end loop;
+    end loop;
+  end if;
+  for m in select value from jsonb_array_elements(p_state->'matches') loop
+    for i in 0..1 loop
+      s:=m->'sources'->i;
+      insert into public.match_slots values(tid,m->>'id',i,s->>'kind',s->>'id');
+      if s->>'kind'='winner' then
+        if not exists(select 1 from public.matches source where source.tournament_id=tid and source.id=s->>'id' and source.phase='knockout' and source.round_number<(m->>'round')::integer) then raise exception 'Ungültige Match-Abhängigkeit'; end if;
+        insert into public.match_dependencies values(tid,s->>'id',m->>'id',i);
+      end if;
+    end loop;
+  end loop;
+  insert into public.public_tournament_snapshots values(tid,p_state,p_state->>'status'='archived',(p_state->>'version')::integer,(p_state->>'updatedAt')::timestamptz)
+    on conflict(id) do update set state=excluded.state,archived=excluded.archived,version=excluded.version,updated_at=excluded.updated_at;
+  update public.public_live_state set tournament_id=(select id from public.tournaments where status<>'archived' order by (status='running') desc,case when status='running' then (state->>'startedAt')::timestamptz else updated_at end desc,id limit 1),version=version+1 where id=1;
+end $$;
+
+create or replace function public.create_tournament(p_state jsonb,p_credentials jsonb,p_session_hash text) returns void language plpgsql security definer set search_path='' as $$
+declare s jsonb; tid uuid:=(p_state->>'id')::uuid; begin
+  s:=public.assert_session(p_session_hash,null,'create');
+  insert into public.tournaments values(tid,p_state,1,p_state->>'status',(p_state->>'createdAt')::timestamptz,(p_state->>'updatedAt')::timestamptz);
+  insert into public.tournament_credentials(tournament_id,admin_hash,admin_version,editor_link_hash,editor_pin_hash,editor_secret,editor_enabled,editor_version)
+    values(tid,p_credentials->>'admin_hash',1,p_credentials->>'editor_link_hash',p_credentials->>'editor_pin_hash',p_credentials->>'editor_secret',true,1);
+  perform public.sync_tournament(p_state);
+  insert into public.audit_events(tournament_id,actor_role,actor_session,action,after_state) values(tid,s->>'role',p_session_hash,'create',p_state);
+end $$;
+create or replace function public.save_tournament(p_state jsonb,p_expected integer,p_session_hash text,p_action text,p_detail jsonb default null) returns void language plpgsql security definer set search_path='' as $$
+declare s jsonb; old public.tournaments; tid uuid:=(p_state->>'id')::uuid; begin
+  s:=public.assert_session(p_session_hash,tid,p_action);
+  select * into old from public.tournaments where id=tid for update;
+  if not found then raise exception 'Turnier nicht gefunden' using errcode='P0002'; end if;
+  if old.version<>p_expected then raise exception 'Das Turnier wurde inzwischen geändert. Bitte aktuellen Stand laden.' using errcode='40001'; end if;
+  if (p_state->>'version')::integer<>p_expected+1 then raise exception 'Ungültige Version'; end if;
+  if s->>'role'='editor' then
+    if old.status='archived' or old.status='planned' or p_state->>'status' not in ('running','completed') or
+      (old.state - array['matches','winner','version','updatedAt','status','groups']) <> (p_state - array['matches','winner','version','updatedAt','status','groups']) or
+      old.state->'groups'<>p_state->'groups' and not (
+        (select jsonb_agg(value-'decisions') from jsonb_array_elements(old.state->'groups')) is not distinct from
+        (select jsonb_agg(value-'decisions') from jsonb_array_elements(p_state->'groups')) and
+        not exists(select 1 from jsonb_array_elements(p_state->'groups') newer
+          join jsonb_array_elements(old.state->'groups') older on newer.value->>'id'=older.value->>'id'
+          where newer.value->'decisions'<>'{}'::jsonb and newer.value->'decisions'<>older.value->'decisions')
+      ) then raise exception 'Strukturelle Änderung nicht erlaubt' using errcode='42501'; end if;
+  end if;
+  update public.tournaments set state=p_state,version=p_expected+1,status=p_state->>'status',updated_at=(p_state->>'updatedAt')::timestamptz where id=tid;
+  perform public.sync_tournament(p_state);
+  insert into public.audit_events(tournament_id,actor_role,actor_session,action,before_state,after_state,detail) values(tid,s->>'role',p_session_hash,p_action,old.state,p_state,p_detail);
+end $$;
+create or replace function public.delete_tournament(p_id uuid,p_expected integer,p_session_hash text) returns void language plpgsql security definer set search_path='' as $$
+declare old public.tournaments; s jsonb; begin
+  s:=public.assert_session(p_session_hash,p_id,'delete');
+  select * into old from public.tournaments where id=p_id for update;
+  if old.version is null then raise exception 'Nicht gefunden'; end if;
+  if old.version<>p_expected then raise exception 'Versionskonflikt' using errcode='40001'; end if;
+  insert into public.audit_events(tournament_id,actor_role,actor_session,action,before_state) values(p_id,s->>'role',p_session_hash,'delete',old.state);
+  -- Remove match references before participant cascades are triggered.
+  delete from public.matches where tournament_id=p_id;
+  delete from public.tournaments where id=p_id;
+  delete from public.players where not exists(select 1 from public.tournament_participants p where p.id=players.id);
+  update public.public_live_state set tournament_id=(select id from public.tournaments where status<>'archived' order by (status='running') desc,case when status='running' then (state->>'startedAt')::timestamptz else updated_at end desc,id limit 1),version=version+1 where id=1;
+end $$;
+create or replace function public.private_list_archived(p_session_hash text) returns jsonb language plpgsql security definer set search_path='' as $$
+declare s jsonb:=public.read_session(p_session_hash); result jsonb; begin
+  if s is null or s->>'role'<>'owner' then raise exception 'Keine Berechtigung' using errcode='42501'; end if;
+  select coalesce(jsonb_agg(state),'[]') into result from public.tournaments where status='archived'; return result;
+end $$;
+create or replace function public.consume_login_attempt(p_key text,p_max integer) returns boolean language plpgsql security definer set search_path='' as $$
+declare count integer; begin
+  insert into public.login_rate_limits values(p_key,1,now()+interval '15 minutes')
+    on conflict(key) do update set attempts=case when login_rate_limits.reset_at<=now() then 1 else login_rate_limits.attempts+1 end,
+      reset_at=case when login_rate_limits.reset_at<=now() then now()+interval '15 minutes' else login_rate_limits.reset_at end returning attempts into count;
+  return count<=p_max;
+end $$;
+create or replace function public.manage_editor_access(p_id uuid,p_session_hash text,p_action text,p_pin_hash text default null,p_secret text default null) returns void language plpgsql security definer set search_path='' as $$
+declare s jsonb; begin
+  s:=public.assert_session(p_session_hash,p_id,'access');
+  perform 1 from public.tournament_credentials where tournament_id=p_id for update;
+  if not found then raise exception 'Turnier nicht gefunden' using errcode='P0002'; end if;
+  if p_action='revoke' and nullif(p_pin_hash,'') is not null and nullif(p_secret,'') is not null then
+    update public.tournament_credentials set editor_pin_hash=p_pin_hash,editor_secret=p_secret,editor_version=editor_version+1 where tournament_id=p_id;
+  elsif p_action in ('enable','disable') and p_pin_hash is null and p_secret is null then
+    update public.tournament_credentials set editor_version=editor_version+1,editor_enabled=(p_action='enable') where tournament_id=p_id;
+  else raise exception 'Ungültige Zugangsaktion' using errcode='22023'; end if;
+  delete from public.sessions where tournament_id=p_id and role='editor';
+  insert into public.audit_events(tournament_id,actor_role,actor_session,action,detail) values(p_id,s->>'role',p_session_hash,'access',jsonb_build_object('action',p_action));
+end $$;
+create or replace function public.installation_health() returns jsonb language sql set search_path='' as $$ select jsonb_build_object('schema_version',1,'ready',true); $$;
+
+drop function if exists public.manage_access(uuid,text,text,text);
+delete from public.sessions where role='admin';
+update public.tournament_credentials set admin_hash='' where admin_hash<>'';
+
+-- All RPCs are callable only by the server key. Helpers are not browser endpoints.
+do $$ declare f record; begin
+  for f in select p.oid::regprocedure as signature from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname in ('read_session','assert_session','sync_tournament','create_tournament','save_tournament','delete_tournament','private_list_archived','consume_login_attempt','manage_editor_access','installation_health') loop
+    execute format('revoke all on function %s from public,anon,authenticated',f.signature);
+    execute format('grant execute on function %s to service_role',f.signature);
+  end loop;
+end $$;
+do $$ begin
+  if not exists(select 1 from pg_publication_tables where pubname='supabase_realtime' and tablename='public_tournament_snapshots') then alter publication supabase_realtime add table public.public_tournament_snapshots; end if;
+  if not exists(select 1 from pg_publication_tables where pubname='supabase_realtime' and tablename='public_live_state') then alter publication supabase_realtime add table public.public_live_state; end if;
+end $$;
+notify pgrst, 'reload schema';
+alter table public.tournament_credentials add column if not exists editor_code_hash text;
+create unique index if not exists unique_editor_code on public.tournament_credentials(editor_code_hash);
+create or replace function public.create_tournament(p_state jsonb,p_credentials jsonb,p_session_hash text) returns void language plpgsql security definer set search_path='' as $$
+declare s jsonb; tid uuid:=(p_state->>'id')::uuid; begin
+  s:=public.assert_session(p_session_hash,null,'create');
+  insert into public.tournaments values(tid,p_state,1,p_state->>'status',(p_state->>'createdAt')::timestamptz,(p_state->>'updatedAt')::timestamptz);
+  insert into public.tournament_credentials(tournament_id,admin_hash,admin_version,editor_link_hash,editor_pin_hash,editor_secret,editor_enabled,editor_version,editor_code_hash)
+    values(tid,'',1,p_credentials->>'editor_link_hash',p_credentials->>'editor_pin_hash',p_credentials->>'editor_secret',true,1,p_credentials->>'editor_code_hash');
+  perform public.sync_tournament(p_state);
+  insert into public.audit_events(tournament_id,actor_role,actor_session,action,after_state) values(tid,s->>'role',p_session_hash,'create',p_state);
+end $$;
+drop function if exists public.manage_editor_access(uuid,text,text,text,text);
+create or replace function public.manage_editor_access(p_id uuid,p_session_hash text,p_action text,p_pin_hash text default null,p_secret text default null,p_code_hash text default null) returns void language plpgsql security definer set search_path='' as $$
+declare s jsonb; begin
+  s:=public.assert_session(p_session_hash,p_id,'access');
+  perform 1 from public.tournament_credentials where tournament_id=p_id for update;
+  if not found then raise exception 'Turnier nicht gefunden' using errcode='P0002'; end if;
+  if p_action='revoke' and nullif(p_pin_hash,'') is not null and nullif(p_secret,'') is not null and p_code_hash ~ '^[a-f0-9]{64}$' then
+    update public.tournament_credentials set editor_pin_hash=p_pin_hash,editor_secret=p_secret,editor_code_hash=p_code_hash,editor_version=editor_version+1 where tournament_id=p_id;
+  elsif p_action in ('enable','disable') and p_pin_hash is null and p_secret is null and p_code_hash is null then
+    update public.tournament_credentials set editor_version=editor_version+1,editor_enabled=(p_action='enable') where tournament_id=p_id;
+  else raise exception 'Ungültige Zugangsaktion' using errcode='22023'; end if;
+  delete from public.sessions where tournament_id=p_id and role='editor';
+  insert into public.audit_events(tournament_id,actor_role,actor_session,action,detail) values(p_id,s->>'role',p_session_hash,'access',jsonb_build_object('action',p_action));
+end $$;
+revoke all on function public.manage_editor_access(uuid,text,text,text,text,text) from public,anon,authenticated;
+grant execute on function public.manage_editor_access(uuid,text,text,text,text,text) to service_role;
+notify pgrst,'reload schema';
+alter table public.sessions add column if not exists participant_id uuid;
+create unique index if not exists one_device_per_player on public.sessions(tournament_id,participant_id) where role='editor' and participant_id is not null;
+create table if not exists public.match_games (
+  tournament_id uuid not null references public.tournaments on delete cascade,
+  match_id text not null, state jsonb not null, version integer not null check(version>0),
+  updated_at timestamptz not null default now(), primary key(tournament_id,match_id)
+);
+alter table public.match_games enable row level security;
+revoke all on public.match_games from anon,authenticated;
+grant select on public.match_games to anon,authenticated;
+grant all on public.match_games to service_role;
+drop policy if exists public_games_read on public.match_games;
+create policy public_games_read on public.match_games for select to anon,authenticated using(
+  exists(select 1 from public.public_tournament_snapshots p where p.id=tournament_id and not p.archived)
+);
+create or replace function public.read_session(p_hash text) returns jsonb language sql security definer set search_path='' as $$
+  select to_jsonb(s) from public.sessions s left join public.tournament_credentials c on c.tournament_id=s.tournament_id
+  where s.token_hash=p_hash and s.expires_at>now() and
+    (s.role='owner' or (s.role='editor' and c.editor_enabled and s.credential_version=c.editor_version));
+$$;
+create or replace function public.claim_player(p_hash text,p_player uuid,p_takeover boolean default false) returns void language plpgsql security definer set search_path='' as $$
+declare s jsonb; tid uuid; begin
+  s:=public.read_session(p_hash);
+  if s is null or s->>'role'<>'editor' then raise exception 'Nicht als Spieler angemeldet' using errcode='28000'; end if;
+  tid:=(s->>'tournament_id')::uuid;
+  perform 1 from public.tournaments where id=tid for update;
+  s:=public.read_session(p_hash);
+  if s is null or s->>'role'<>'editor' then raise exception 'Sitzung wurde beendet' using errcode='28000'; end if;
+  if not exists(select 1 from public.tournaments t,jsonb_array_elements(t.state->'participants') p where t.id=tid and p->>'id'=p_player::text) then raise exception 'Spieler gehört nicht zum Turnier' using errcode='42501'; end if;
+  if not p_takeover and exists(select 1 from public.sessions where tournament_id=tid and participant_id=p_player and token_hash<>p_hash and expires_at>now()) then raise exception 'PLAYER_IN_USE' using errcode='P0001'; end if;
+  delete from public.sessions where tournament_id=tid and participant_id=p_player and token_hash<>p_hash;
+  update public.sessions set participant_id=p_player where token_hash=p_hash;
+end $$;
+-- Wrap the existing transaction without exposing the helper to API clients.
+do $$ begin
+  if to_regprocedure('public.save_tournament_base(jsonb,integer,text,text,jsonb)') is null then
+    alter function public.save_tournament(jsonb,integer,text,text,jsonb) rename to save_tournament_base;
+  end if;
+end $$;
+revoke all on function public.save_tournament_base(jsonb,integer,text,text,jsonb) from public,anon,authenticated,service_role;
+create or replace function public.save_tournament(p_state jsonb,p_expected integer,p_session_hash text,p_action text,p_detail jsonb default null) returns void language plpgsql security definer set search_path='' as $$
+declare s jsonb; tid uuid:=(p_state->>'id')::uuid; original jsonb; selected_match jsonb; begin
+  select state into original from public.tournaments where id=tid for update;
+  s:=public.assert_session(p_session_hash,tid,p_action);
+  if s->>'role'='editor' then
+    if s->>'participant_id' is null or p_detail->>'matchId' is null then raise exception 'Bitte zuerst einen Spieler auswählen' using errcode='42501'; end if;
+    select m into selected_match from jsonb_array_elements(original->'matches') m where m->>'id'=p_detail->>'matchId';
+    if selected_match is null or not (selected_match->'players' ? (s->>'participant_id')) then raise exception 'Nur eigene Matches dürfen bearbeitet werden' using errcode='42501'; end if;
+  end if;
+  if exists(select 1 from public.match_games g where g.tournament_id=tid and g.state->>'phase'<>'finished' and
+    (p_detail->>'action' in ('redraw','status') or g.match_id=p_detail->>'matchId' or coalesce(p_detail->'resets','[]'::jsonb) ? g.match_id))
+  then raise exception 'Ein betroffenes Match wird gerade gespielt. Bitte zuerst beenden oder als Admin zurücksetzen.' using errcode='55000'; end if;
+  perform public.save_tournament_base(p_state,p_expected,p_session_hash,p_action,p_detail);
+  delete from public.match_games where tournament_id=tid and (match_id=p_detail->>'matchId' or coalesce(p_detail->'resets','[]'::jsonb) ? match_id or p_detail->>'action'='redraw');
+end $$;
+create or replace function public.write_game(p_id uuid,p_match text,p_expected integer,p_hash text,p_state jsonb,p_tournament jsonb default null,p_tournament_expected integer default null) returns void language plpgsql security definer set search_path='' as $$
+declare s jsonb; t public.tournaments; g public.match_games; m jsonb; begin
+  select * into t from public.tournaments where id=p_id for update;
+  s:=public.read_session(p_hash);
+  if s is null or s->>'role'<>'editor' or s->>'participant_id' is null or s->>'tournament_id'<>p_id::text then raise exception 'Bitte als Spieler anmelden' using errcode='42501'; end if;
+  if not found or t.status<>'running' then raise exception 'Das Turnier ist nicht aktiv' using errcode='55000'; end if;
+  select value into m from jsonb_array_elements(t.state->'matches') where value->>'id'=p_match;
+  if m is null or (m->>'automatic')::boolean or m->>'status'='finished' or m->'players'->>0 is null or m->'players'->>1 is null or not (m->'players' ? (s->>'participant_id')) then raise exception 'Dieses Match darfst du nicht spielen' using errcode='42501'; end if;
+  if p_state->'players'<>m->'players' or (p_state->>'version')::integer<>p_expected+1 then raise exception 'Ungültiger Spielstand' using errcode='22023'; end if;
+  select * into g from public.match_games where tournament_id=p_id and match_id=p_match for update;
+  if found then
+    if g.version<>p_expected then raise exception 'Spielstand inzwischen geändert' using errcode='40001'; end if;
+    if g.state->>'phase'='finished' or (g.state->>'phase'='playing' and g.state->>'activePlayer'<>s->>'participant_id') then raise exception 'Du bist nicht an der Reihe' using errcode='42501'; end if;
+  else
+    if p_expected<>0 or p_state->>'phase'<>'bull' then raise exception 'Spielstand inzwischen geändert' using errcode='40001'; end if;
+    if exists(select 1 from public.match_games other where other.tournament_id=p_id and other.state->>'phase'<>'finished' and other.state->'players' ? (s->>'participant_id')) then raise exception 'Du spielst bereits ein anderes Match' using errcode='55000'; end if;
+    if exists(select 1 from public.match_games other where other.tournament_id=p_id and other.state->>'phase'<>'finished' and (other.state->'players' ? (m->'players'->>0) or other.state->'players' ? (m->'players'->>1))) then raise exception 'Ein Gegner spielt bereits ein anderes Match' using errcode='55000'; end if;
+  end if;
+  if p_tournament is not null then
+    if (p_tournament->>'id')::uuid<>p_id or p_tournament_expected<>t.version then raise exception 'Turnier inzwischen geändert' using errcode='40001'; end if;
+    perform public.save_tournament_base(p_tournament,p_tournament_expected,p_hash,'score',jsonb_build_object('action','game','matchId',p_match));
+  end if;
+  insert into public.match_games values(p_id,p_match,p_state,p_expected+1,now())
+    on conflict(tournament_id,match_id) do update set state=excluded.state,version=excluded.version,updated_at=excluded.updated_at;
+end $$;
+create or replace function public.reset_game(p_id uuid,p_match text,p_hash text,p_state jsonb,p_expected integer) returns void language plpgsql security definer set search_path='' as $$
+declare s jsonb; begin
+  s:=public.assert_session(p_hash,p_id,'delete');
+  perform 1 from public.tournaments where id=p_id for update;
+  perform public.save_tournament_base(p_state,p_expected,p_hash,'manage',jsonb_build_object('action','reset-game','matchId',p_match));
+  delete from public.match_games where tournament_id=p_id and match_id=p_match;
+end $$;
+do $$ declare f record; begin
+  for f in select p.oid::regprocedure as signature from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+    where n.nspname='public' and p.proname in ('read_session','claim_player','save_tournament','write_game','reset_game') loop
+    execute format('revoke all on function %s from public,anon,authenticated',f.signature);
+    execute format('grant execute on function %s to service_role',f.signature);
+  end loop;
+  if not exists(select 1 from pg_publication_tables where pubname='supabase_realtime' and tablename='match_games') then
+    alter publication supabase_realtime add table public.match_games;
+  end if;
+end $$;
+notify pgrst,'reload schema';
+
+-- Admin darf optional als Spieler teilnehmen, ohne Verwaltungsrechte zu verlieren.
+alter table public.sessions add column if not exists playing_tournament_id uuid references public.tournaments(id) on delete set null;
+drop index if exists public.one_device_per_player;
+create unique index one_device_per_player on public.sessions((coalesce(playing_tournament_id,tournament_id)),participant_id) where role in ('owner','editor') and participant_id is not null;
+create or replace function public.choose_tournament_player(p_hash text,p_id uuid,p_player uuid,p_takeover boolean default false) returns void language plpgsql security definer set search_path='' as $$
+declare s jsonb; begin
+  perform 1 from public.tournaments where id=p_id for update;
+  if not found then raise exception 'Turnier nicht verfügbar' using errcode='P0002'; end if;
+  s:=public.read_session(p_hash);
+  if s is null or s->>'role' not in ('owner','editor') then raise exception 'Bitte anmelden' using errcode='28000'; end if;
+  if s->>'role'='editor' and ((s->>'tournament_id')::uuid<>p_id or p_player is null) then raise exception 'Nur Spieler des eigenen Turniers wählen' using errcode='42501'; end if;
+  if p_player is null then
+    update public.sessions set participant_id=null,playing_tournament_id=null where token_hash=p_hash;
+    return;
+  end if;
+  if not exists(select 1 from public.tournaments t,jsonb_array_elements(t.state->'participants') p where t.id=p_id and p->>'id'=p_player::text and t.status<>'archived') then raise exception 'Spieler gehört nicht zu einem verfügbaren Turnier' using errcode='42501'; end if;
+  if not p_takeover and exists(select 1 from public.sessions where coalesce(playing_tournament_id,tournament_id)=p_id and participant_id=p_player and token_hash<>p_hash and expires_at>now()) then raise exception 'PLAYER_IN_USE' using errcode='P0001'; end if;
+  -- Bei einer Übernahme bleiben die Verwaltungsrechte anderer Admin-Geräte erhalten.
+  update public.sessions set participant_id=null,playing_tournament_id=null where role='owner' and playing_tournament_id=p_id and participant_id=p_player and token_hash<>p_hash;
+  delete from public.sessions where role='editor' and tournament_id=p_id and participant_id=p_player and token_hash<>p_hash;
+  update public.sessions set participant_id=p_player,playing_tournament_id=case when role='owner' then p_id else null end where token_hash=p_hash;
+end $$;
+revoke all on function public.choose_tournament_player(text,uuid,uuid,boolean) from public,anon,authenticated;
+grant execute on function public.choose_tournament_player(text,uuid,uuid,boolean) to service_role;
+
+create or replace function public.write_game(p_id uuid,p_match text,p_expected integer,p_hash text,p_state jsonb,p_tournament jsonb default null,p_tournament_expected integer default null) returns void language plpgsql security definer set search_path='' as $$
+declare s jsonb; t public.tournaments; g public.match_games; m jsonb; begin
+  select * into t from public.tournaments where id=p_id for update;
+  s:=public.read_session(p_hash);
+  if s is null or s->>'role' not in ('owner','editor') or s->>'participant_id' is null or coalesce(s->>'playing_tournament_id',s->>'tournament_id')<>p_id::text then raise exception 'Bitte als Spieler anmelden' using errcode='42501'; end if;
+  if not found or t.status<>'running' then raise exception 'Das Turnier ist nicht aktiv' using errcode='55000'; end if;
+  select value into m from jsonb_array_elements(t.state->'matches') where value->>'id'=p_match;
+  if m is null or (m->>'automatic')::boolean or m->>'status'='finished' or m->'players'->>0 is null or m->'players'->>1 is null or not (m->'players' ? (s->>'participant_id')) then raise exception 'Dieses Match darfst du nicht spielen' using errcode='42501'; end if;
+  if p_state->'players'<>m->'players' or (p_state->>'version')::integer<>p_expected+1 then raise exception 'Ungültiger Spielstand' using errcode='22023'; end if;
+  select * into g from public.match_games where tournament_id=p_id and match_id=p_match for update;
+  if found then
+    if g.version<>p_expected then raise exception 'Spielstand inzwischen geändert' using errcode='40001'; end if;
+    if g.state->>'phase'='finished' or (g.state->>'phase'='playing' and g.state->>'activePlayer'<>s->>'participant_id') then raise exception 'Du bist nicht an der Reihe' using errcode='42501'; end if;
+  else
+    if p_expected<>0 or p_state->>'phase'<>'bull' then raise exception 'Spielstand inzwischen geändert' using errcode='40001'; end if;
+    if exists(select 1 from public.match_games other where other.tournament_id=p_id and other.state->>'phase'<>'finished' and other.state->'players' ? (s->>'participant_id')) then raise exception 'Du spielst bereits ein anderes Match' using errcode='55000'; end if;
+    if exists(select 1 from public.match_games other where other.tournament_id=p_id and other.state->>'phase'<>'finished' and (other.state->'players' ? (m->'players'->>0) or other.state->'players' ? (m->'players'->>1))) then raise exception 'Ein Gegner spielt bereits ein anderes Match' using errcode='55000'; end if;
+  end if;
+  if p_tournament is not null then
+    if (p_tournament->>'id')::uuid<>p_id or p_tournament_expected<>t.version then raise exception 'Turnier inzwischen geändert' using errcode='40001'; end if;
+    perform public.save_tournament_base(p_tournament,p_tournament_expected,p_hash,'score',jsonb_build_object('action','game','matchId',p_match));
+  end if;
+  insert into public.match_games values(p_id,p_match,p_state,p_expected+1,now())
+    on conflict(tournament_id,match_id) do update set state=excluded.state,version=excluded.version,updated_at=excluded.updated_at;
+end $$;
+
+notify pgrst,'reload schema';
+commit;
+
+-- VERSION 2: Gemeinsames aktuelles Scheibenbild. Vollständig im SQL Editor ausführen.
+-- Nur das letzte Bild je Spieler/Match wird gespeichert. Keine Autodarts-Zugangsdaten.
+begin;
+create table if not exists public.match_board_images (
+  tournament_id uuid not null, match_id text not null, player_id uuid not null,
+  session_hash text not null, connection_id uuid not null,
+  visit_key text not null, image text, revision uuid not null,
+  frame_at timestamptz not null default now(), updated_at timestamptz not null default now(),
+  primary key(tournament_id,match_id,player_id),
+  foreign key(tournament_id,match_id) references public.match_games(tournament_id,match_id) on delete cascade,
+  check(image is null or (length(image)<=1400000 and image ~ '^data:image/(jpeg|png|webp);base64,'))
+);
+alter table public.match_board_images enable row level security;
+revoke all on public.match_board_images from anon,authenticated;
+grant all on public.match_board_images to service_role;
+create or replace function public.write_board_image(p_id uuid,p_match text,p_hash text,p_connection uuid,p_visit text,p_operation text,p_image text,p_frame_at timestamptz) returns boolean language plpgsql security definer set search_path='' as $$
+declare s jsonb; g jsonb; pid uuid; tid uuid; current_visit text;
+begin
+  s:=public.read_session(p_hash);
+  if s is null or s->>'role' not in ('owner','editor') or s->>'participant_id' is null then raise exception 'Bitte als Spieler anmelden' using errcode='42501'; end if;
+  pid:=(s->>'participant_id')::uuid;
+  tid:=(case when s->>'role'='owner' then s->>'playing_tournament_id' else s->>'tournament_id' end)::uuid;
+  if tid is distinct from p_id then raise exception 'Falsches Turnier' using errcode='42501'; end if;
+  select state into g from public.match_games where tournament_id=p_id and match_id=p_match;
+  if g is null or not (g->'players' ? pid::text) then raise exception 'Nur eigene Matches' using errcode='42501'; end if;
+  if p_operation='clear' then
+    update public.match_board_images set image=null,updated_at=now(),frame_at=now(),revision=gen_random_uuid()
+      where tournament_id=p_id and match_id=p_match and player_id=pid and connection_id=p_connection;
+    return true;
+  end if;
+  current_visit:=(g->>'phase')||':'||(case when g->>'phase'='bull' then g->>'bullRound' else jsonb_array_length(g->'turns')::text end);
+  if g->>'phase' not in ('bull','playing') or current_visit is distinct from p_visit or (g->>'phase'='playing' and g->>'activePlayer' is distinct from pid::text) then return false; end if;
+  if p_operation='heartbeat' then
+    update public.match_board_images set updated_at=now() where tournament_id=p_id and match_id=p_match and player_id=pid and session_hash=p_hash and connection_id=p_connection and visit_key=p_visit and image is not null;
+    return true;
+  end if;
+  if p_operation<>'frame' or p_image is null or length(p_image)>1400000 or p_image !~ '^data:image/(jpeg|png|webp);base64,' then raise exception 'Ungültiges Bild'; end if;
+  insert into public.match_board_images(tournament_id,match_id,player_id,session_hash,connection_id,visit_key,image,revision,frame_at,updated_at)
+    values(p_id,p_match,pid,p_hash,p_connection,p_visit,p_image,gen_random_uuid(),p_frame_at,now())
+    on conflict(tournament_id,match_id,player_id) do update set session_hash=excluded.session_hash,connection_id=excluded.connection_id,visit_key=excluded.visit_key,image=excluded.image,revision=excluded.revision,frame_at=excluded.frame_at,updated_at=now()
+    where public.match_board_images.frame_at<=excluded.frame_at;
+  return true;
+end $$;
+revoke all on function public.write_board_image(uuid,text,text,uuid,text,text,text,timestamptz) from public,anon,authenticated;
+grant execute on function public.write_board_image(uuid,text,text,uuid,text,text,text,timestamptz) to service_role;
+notify pgrst,'reload schema';
+commit;
+
+-- VERSION 2: Mehrere Spieler auf einem Gerät und zwischengespeicherte leere Scheibe.
+begin;
+alter table public.sessions add column if not exists participant_ids uuid[] not null default '{}';
+update public.sessions set participant_ids=array[participant_id] where participant_id is not null and cardinality(participant_ids)=0;
+create or replace function public.choose_device_players(p_hash text,p_id uuid,p_players uuid[],p_takeover boolean default false) returns void language plpgsql security definer set search_path='' as $$
+declare s jsonb; other record; remaining uuid[];
+begin
+ perform 1 from public.tournaments where id=p_id for update;
+ if not found then raise exception 'Turnier nicht verfügbar' using errcode='P0002'; end if;
+ s:=public.read_session(p_hash);
+ if s is null or s->>'role' not in ('owner','editor') or (s->>'role'='editor' and (s->>'tournament_id')::uuid<>p_id) then raise exception 'Bitte anmelden' using errcode='42501'; end if;
+ if p_players is null or cardinality(p_players)>20 or (cardinality(p_players)=0 and s->>'role'<>'owner') or exists(select 1 from unnest(p_players) p where p is null) or (select count(distinct p) from unnest(p_players) p)<>cardinality(p_players) then raise exception 'Ungültige Spielerauswahl' using errcode='22023'; end if;
+ if exists(select 1 from unnest(p_players) p where not exists(select 1 from public.tournaments t,jsonb_array_elements(t.state->'participants') v where t.id=p_id and v->>'id'=p::text and t.status<>'archived')) then raise exception 'Spieler gehört nicht zum Turnier' using errcode='42501'; end if;
+ if not p_takeover and exists(select 1 from public.sessions where token_hash<>p_hash and coalesce(playing_tournament_id,tournament_id)=p_id and expires_at>now() and (participant_ids && p_players or participant_id=any(p_players))) then raise exception 'PLAYER_IN_USE' using errcode='P0001'; end if;
+ for other in select * from public.sessions where token_hash<>p_hash and coalesce(playing_tournament_id,tournament_id)=p_id and (participant_ids && p_players or participant_id=any(p_players)) for update loop
+   remaining:=array(select distinct x from unnest(case when cardinality(other.participant_ids)>0 then other.participant_ids else array[other.participant_id] end) x where x is not null and not(x=any(p_players)));
+   if cardinality(remaining)=0 and other.role='editor' then delete from public.sessions where token_hash=other.token_hash;
+   else update public.sessions set participant_ids=remaining,participant_id=remaining[1],playing_tournament_id=case when role='owner' and cardinality(remaining)=0 then null else playing_tournament_id end where token_hash=other.token_hash; end if;
+ end loop;
+ update public.sessions set participant_ids=p_players,participant_id=p_players[1],playing_tournament_id=case when role='owner' and cardinality(p_players)>0 then p_id else null end where token_hash=p_hash;
+end $$;
+create or replace function public.choose_tournament_player(p_hash text,p_id uuid,p_player uuid,p_takeover boolean default false) returns void language plpgsql security definer set search_path='' as $$ begin
+ perform public.choose_device_players(p_hash,p_id,case when p_player is null then '{}'::uuid[] else array[p_player] end,p_takeover);
+end $$;
+create or replace function public.claim_player(p_hash text,p_player uuid,p_takeover boolean default false) returns void language plpgsql security definer set search_path='' as $$
+declare s jsonb;begin s:=public.read_session(p_hash);if s is null or s->>'role'<>'editor' then raise exception 'Bitte als Spieler anmelden' using errcode='42501';end if;perform public.choose_device_players(p_hash,(s->>'tournament_id')::uuid,array[p_player],p_takeover);end $$;
+create or replace function public.begin_device_action(p_hash text,p_id uuid,p_actor uuid) returns uuid language plpgsql security definer set search_path='' as $$
+declare s jsonb;original uuid;begin
+ perform 1 from public.tournaments where id=p_id for update;
+ perform 1 from public.sessions where token_hash=p_hash for update;
+ s:=public.read_session(p_hash);
+ if s is null or s->>'role' not in ('owner','editor') or coalesce(s->>'playing_tournament_id',s->>'tournament_id') is distinct from p_id::text or p_actor is null or not(coalesce(s->'participant_ids','[]'::jsonb) ? p_actor::text or s->>'participant_id'=p_actor::text) then raise exception 'Spieler ist diesem Gerät nicht zugeordnet' using errcode='42501';end if;
+ original:=(s->>'participant_id')::uuid;update public.sessions set participant_id=p_actor where token_hash=p_hash;return original;
+end $$;
+create or replace function public.write_device_game(p_id uuid,p_match text,p_expected integer,p_hash text,p_actor uuid,p_state jsonb,p_tournament jsonb default null,p_tournament_expected integer default null) returns void language plpgsql security definer set search_path='' as $$
+declare original uuid;begin original:=public.begin_device_action(p_hash,p_id,p_actor);perform public.write_game(p_id,p_match,p_expected,p_hash,p_state,p_tournament,p_tournament_expected);update public.sessions set participant_id=original where token_hash=p_hash;end $$;
+create or replace function public.save_device_tournament(p_state jsonb,p_expected integer,p_session_hash text,p_actor uuid,p_action text,p_detail jsonb default null) returns void language plpgsql security definer set search_path='' as $$
+declare original uuid;begin original:=public.begin_device_action(p_session_hash,(p_state->>'id')::uuid,p_actor);perform public.save_tournament(p_state,p_expected,p_session_hash,p_action,p_detail);update public.sessions set participant_id=original where token_hash=p_session_hash;end $$;
+alter table public.match_board_images add column if not exists empty_image text;
+alter table public.match_board_images add column if not exists empty_revision uuid;
+alter table public.match_board_images drop constraint if exists empty_image_size;
+alter table public.match_board_images add constraint empty_image_size check(empty_image is null or (length(empty_image)<=1400000 and empty_image ~ '^data:image/(jpeg|png|webp);base64,'));
+create or replace function public.write_cached_board_image(p_id uuid,p_match text,p_hash text,p_actor uuid,p_connection uuid,p_visit text,p_operation text,p_image text,p_frame_at timestamptz,p_empty boolean default false) returns boolean language plpgsql security definer set search_path='' as $$
+declare original uuid; accepted boolean;g jsonb;begin
+ original:=public.begin_device_action(p_hash,p_id,p_actor);
+ select state into g from public.match_games where tournament_id=p_id and match_id=p_match;
+ if g is null or not(g->'players' ? p_actor::text) then raise exception 'Nur eigene Matches' using errcode='42501';end if;
+ if p_empty and p_operation='frame' then
+  insert into public.match_board_images(tournament_id,match_id,player_id,session_hash,connection_id,visit_key,image,revision,frame_at,updated_at,empty_image,empty_revision) values(p_id,p_match,p_actor,p_hash,p_connection,p_visit,null,gen_random_uuid(),p_frame_at,now(),p_image,gen_random_uuid())
+   on conflict(tournament_id,match_id,player_id) do update set empty_image=excluded.empty_image,empty_revision=excluded.empty_revision,session_hash=excluded.session_hash,connection_id=excluded.connection_id,image=null,revision=excluded.revision,frame_at=excluded.frame_at,updated_at=now() where public.match_board_images.frame_at<=excluded.frame_at;
+  accepted:=true;
+ else accepted:=public.write_board_image(p_id,p_match,p_hash,p_connection,p_visit,p_operation,p_image,p_frame_at);
+ end if;
+ if p_operation='clear' then update public.match_board_images set image=null,empty_image=null,empty_revision=null,revision=gen_random_uuid(),updated_at=now(),frame_at=now() where tournament_id=p_id and match_id=p_match and session_hash=p_hash and connection_id=p_connection;end if;
+ update public.sessions set participant_id=original where token_hash=p_hash;
+ return accepted;
+end $$;
+do $$ declare f record;begin
+ for f in select p.oid::regprocedure as signature from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname in ('choose_device_players','choose_tournament_player','claim_player','begin_device_action','write_device_game','save_device_tournament','write_cached_board_image') loop
+ execute format('revoke all on function %s from public,anon,authenticated',f.signature);execute format('grant execute on function %s to service_role',f.signature);
+ end loop;
+end $$;
+notify pgrst,'reload schema';
+commit;

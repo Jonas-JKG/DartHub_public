@@ -1,0 +1,5 @@
+'use client';
+import {translate as t,useLanguage} from '../i18n/locale';
+import {ticTacToeView} from '../domain/tic-tac-toe';
+import type {PublicDeckGame} from '../domain/dartdeck';
+export default function TicTacToeBoard({game}:{game:PublicDeckGame}){useLanguage();const board=ticTacToeView(game),active=game.players[game.active];return <div className="tic-tac-toe"><div className="bingo-grid ttt-grid" role="grid" aria-readonly="true" aria-label="Tic-Tac-Toe">{board.targets.map((target,i)=>{const owner=board.cells[i]??(board.claim===i?active.id:null),symbol=owner?game.players.findIndex(p=>p.id===owner)===0?'X':'O':null,label=(target.multiplier===2?'D':target.multiplier===3?'T':'')+target.number;return <div role="gridcell" key={i} className={(owner?'marked ':'')+(board.claim===i?'pending':'')} aria-label={symbol??label}>{symbol?<strong className={'ttt-'+symbol.toLowerCase()}>{symbol}</strong>:<span>{label}</span>}</div>;})}</div><p className="bingo-status">{board.claim>=0?t('Feld getroffen. Mit Weiter bestätigen.'):t('Ein Dart pro Zug für ein freies Feld.')} {t('Neue Ziele nach beiden Spielerzügen.')}</p></div>;}
