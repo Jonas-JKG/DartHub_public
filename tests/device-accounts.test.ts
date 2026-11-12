@@ -79,3 +79,9 @@ it('a primary account’s remembered player from another tournament cannot mask 
  m.rpc.mockImplementation(async(name,p)=>name==='account_play_session'&&p.p_hash===other.token_hash?children[1]:null);
  const r=await GET(req());expect(r.status).toBe(200);const data=await r.json();expect(data.session).toMatchObject({participantId:game.players[1],participantIds:[game.players[1]],tournamentId:t.id});
 });
+
+it('persistent primary accounts can keep additional accounts without an invalid cookie date',()=>{
+ const response=setDeviceAccounts(NextResponse.json({ok:true}),{...root,expires_at:'infinity'},[rawExtra]);
+ const cookie=response.cookies.get(deviceAccountsCookie)!;expect(cookie.expires).toBeInstanceOf(Date);expect(Number.isFinite((cookie.expires as Date).getTime())).toBe(true);
+ expect(deviceTokens(req(undefined,cookie.value),{...root,expires_at:'infinity'})).toEqual([rawExtra]);
+});

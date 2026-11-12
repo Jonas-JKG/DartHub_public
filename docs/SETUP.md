@@ -3,7 +3,7 @@
 ## Neue Supabase-Datenbank
 
 1. Ein eigenes Supabase-Projekt erstellen.
-2. Im SQL Editor auf einer **leeren neuen Datenbank** alle Dateien in `supabase/migrations/` von `001_initial.sql` bis `027_camera_delivery.sql` in aufsteigender Reihenfolge ausführen. Jede Datei vollständig ausführen. Die vollständige Nummernfolge zählt; nicht nur die letzte Migration installieren.
+2. Im SQL Editor auf einer **leeren neuen Datenbank** alle Dateien in `supabase/migrations/` von `001_initial.sql` bis `028_camera_names_sessions.sql` in aufsteigender Reihenfolge ausführen. Jede Datei vollständig ausführen. Die vollständige Nummernfolge zählt; nicht nur die letzte Migration installieren.
 3. Bei bestehenden Installationen zuerst ein Backup erstellen und nur fehlende Migrationen in Reihenfolge ergänzen. Alte Einrichtungsskripte danach nicht erneut über den aktuellen Stand laufen lassen. Die ältere Sammeldatei `DATENBANK_EINRICHTEN.sql` ersetzt die nachfolgenden Migrationen nicht.
 4. Erst nach erfolgreicher Migration `MANAGER_AUTH_ENABLED=true` setzen. Der historische Variablenname schaltet heute Spielerkonten frei.
 

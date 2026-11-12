@@ -9,3 +9,12 @@ it('preserves a stable takeout epoch through a slow connection even if the next 
 it('scores measured tips on the physical inner edges of double and triple rings',()=>{expect(cameraHit({x:500000,y:500000+161/451*1e6,confidence:1}).multiplier).toBe(2);expect(cameraHit({x:500000,y:500000+98/451*1e6,confidence:1}).multiplier).toBe(3);});
 
 it('tracks jittering old tips one to one and accepts second and third darts in a tight group',()=>{const c=new CameraCursor();c.accept(1,true,[],true,'a',100,1,true);c.accept(2,true,[tip],true,'a',200,1);expect(c.accept(3,true,[tip],true,'a',300,1).index).toBe(0);const second={...tip,x:tip.x+3000},jitter={...tip,y:tip.y+6000};c.accept(4,true,[jitter,second],true,'a',400,1);expect(c.accept(5,true,[jitter,second],true,'a',500,1).index).toBe(1);const third={...tip,x:tip.x+9000};c.accept(6,true,[jitter,second,third],true,'a',600,1);expect(c.accept(7,true,[jitter,second,third],true,'a',700,1).index).toBe(2);expect(c.accept(8,true,[jitter,second,third],true,'a',800,1).hit).toBeUndefined();});
+
+import {uniqueCameraName} from '../src/domain/camera';
+it('adds the first free numeric suffix, ignores case/spacing and preserves the current camera name',()=>{
+ const devices=[{id:'a',name:' Küche '},{id:'b',name:'küche-2'}];
+ expect(uniqueCameraName('Küche',devices)).toBe('Küche-3');expect(uniqueCameraName('Küche-2',devices)).toBe('Küche-3');expect(uniqueCameraName('Küche',devices,'a')).toBe('Küche');
+ expect(uniqueCameraName('Ku\u0308che',devices)).toBe('Küche-3');expect(uniqueCameraName('Phone',devices)).toBe('Phone');
+ const huge='Phone-9007199254740991';expect(uniqueCameraName(huge,[{id:'1',name:'Phone'},{id:'2',name:huge},{id:'3',name:'Phone-9007199254740992'}])).toBe(huge+'-2');
+ const long='a'.repeat(50);const assigned=uniqueCameraName(long,[{id:'a',name:long}]);expect(assigned).toBe('a'.repeat(48)+'-2');expect(assigned.length).toBe(50);
+});

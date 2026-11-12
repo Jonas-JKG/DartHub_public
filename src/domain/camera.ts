@@ -35,3 +35,19 @@ export class CameraCursor{
   if(!eligible||index>2)return {status:'active'};this.armedVisit=visit;return {hit:cameraHit(tip),index,status:'active'};
  }
 }
+
+/** A saved camera name is unique within its owning account. */
+export const normalizeCameraName=(name:string)=>name.normalize('NFC').replace(/\s+/gu,' ').trim();
+export const cameraNameKey=(name:string)=>normalizeCameraName(name).toLowerCase();
+/** Reuse the current device's name; new devices get the first available -N. */
+export function uniqueCameraName(requested:string,devices:readonly {id:string;name:string}[],ownId?:string|null){
+ let base=normalizeCameraName(requested);const used=new Set(devices.filter(d=>d.id!==ownId).map(d=>cameraNameKey(d.name)));
+ if(!used.has(cameraNameKey(base)))return base;
+ const numbered=base.match(/^(.*)-([0-9]+)$/u);let first=2;
+ if(numbered&&used.has(cameraNameKey(numbered[1]))&&Number.isSafeInteger(Number(numbered[2]))&&Number(numbered[2])>=2&&Number(numbered[2])<Number.MAX_SAFE_INTEGER-devices.length-2){base=numbered[1];first=Number(numbered[2])+1;}
+ for(let index=first;;index++){
+  const suffix='-'+index;let prefix=base.slice(0,50-suffix.length).trimEnd();
+  if(/[\uD800-\uDBFF]$/.test(prefix))prefix=prefix.slice(0,-1);
+  const candidate=prefix+suffix;if(!used.has(cameraNameKey(candidate)))return candidate;
+ }
+}

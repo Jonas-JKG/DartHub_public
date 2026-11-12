@@ -1,3 +1,4 @@
+import {ADMIN_SESSION_MS} from '../../../server/session-lifetime';
 import {deviceAccounts} from '../../../server/device-accounts';
 import {playSession,primarySession,playerCookie,devicePlaySessions} from '../../../server/play-context';
 import { gameView, type Game } from '../../../domain/scoring';
@@ -84,7 +85,7 @@ export async function POST(request: NextRequest) {
       if(p.role==='editor')return response({error:'Bitte mit deinem Spielerkonto anmelden.'},410);
       if(!await verifyPassword(p.password,process.env.OWNER_PASSWORD_HASH!))return response({error:'Zugangsdaten ungültig oder Zugang deaktiviert.'},401);
       const tournamentId=null,credentialVersion=1;
-      const rawToken = token(), expires = new Date(Date.now()+0.5*86400000);
+      const rawToken = token(), expires = new Date(Date.now()+ADMIN_SESSION_MS);
       const { error } = await db().from('sessions').insert({ token_hash: hashToken(rawToken), role, tournament_id: tournamentId, credential_version: credentialVersion, expires_at: expires.toISOString() });
       if (error) throw error;
 

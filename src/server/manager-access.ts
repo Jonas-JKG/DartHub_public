@@ -1,3 +1,4 @@
+import {sessionCookieExpiry,PERSISTENT_SESSION_EXPIRY} from './session-lifetime';
 import {normalizeUsername,usernamePattern} from '../domain/username';
 import { db, DatabaseError, rpc } from './repositories/supabase';
 import { encrypt,decrypt,hashToken,token } from './security';
@@ -36,8 +37,8 @@ export async function createManagerSession(user:{id:string;email?:string;email_c
   if(!assigned.error)actualHandle=username;
  }
 
- const raw=token(),expires=new Date(Date.now()+7*86400000);
- const result=await db().from('sessions').insert({token_hash:hashToken(raw),role:'owner',tournament_id:null,manager_id:user.id,credential_version:1,expires_at:expires.toISOString()});
+ const raw=token(),expires=sessionCookieExpiry(PERSISTENT_SESSION_EXPIRY);
+ const result=await db().from('sessions').insert({token_hash:hashToken(raw),role:'owner',tournament_id:null,manager_id:user.id,credential_version:1,expires_at:PERSISTENT_SESSION_EXPIRY});
  if(result.error)throw new DatabaseError(result.error.message,result.error.code);
  return {raw,expires,redirect:!actualHandle||!profile.onboarding_completed_at?'/account/setup':'/'};
 }

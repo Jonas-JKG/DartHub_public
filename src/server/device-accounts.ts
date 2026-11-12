@@ -1,3 +1,4 @@
+import {sessionCookieExpiry} from './session-lifetime';
 import {NextRequest,NextResponse} from 'next/server';
 import {z} from 'zod';
 import {encrypt,decrypt} from './security';
@@ -16,5 +17,5 @@ export async function deviceAccounts(r:NextRequest,root:Session|null){
 }
 export function setDeviceAccounts(response:NextResponse,root:Session,tokens:string[]){
  if(!tokens.length){response.cookies.delete(deviceAccountsCookie);return response;}
- response.cookies.set(deviceAccountsCookie,encrypt(JSON.stringify({parent:root.token_hash,tokens})),{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'strict',path:'/',expires:new Date(root.expires_at)});return response;
+ response.cookies.set(deviceAccountsCookie,encrypt(JSON.stringify({parent:root.token_hash,tokens})),{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'strict',path:'/',expires:sessionCookieExpiry(root.expires_at)});return response;
 }

@@ -62,6 +62,7 @@ describe('Serverseitige API-Sicherheitsgrenzen',()=>{
   it('gemeinsame Anmeldung erkennt Admin-Passwort ohne Rollenwahl',async()=>{
     const res=await POST(request('login',{password:'mein-admin-passwort'}));
     expect(res.status).toBe(200);expect(await res.json()).toMatchObject({role:'admin',redirect:'/',tournamentId:null});
+    const expires=res.cookies.get('dartbracket_session')!.expires as Date;expect(Math.abs(expires.getTime()-Date.now()-7*86400000)).toBeLessThan(3000);
   });
   it('PINs öffnen auch bei behaupteter Owner-Rolle kein Turnier',async()=>{const r=await POST(request('login',{password:'012345',role:'owner'}));expect(r.status).toBe(401);expect(r.headers.get('set-cookie')).toBeNull();});
   it('deaktivierte PIN funktioniert auch über die gemeinsame Anmeldung nicht',async()=>{

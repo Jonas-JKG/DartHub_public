@@ -19,7 +19,7 @@
   "Anmeldung konnte nicht geprüft werden.": "Could not check your sign-in.",
   "Anmeldung nicht möglich.": "Unable to sign in.",
   "Erneut versuchen": "Try again",
-  "Willkommen bei Dartbracket": "Welcome to Dartbracket",
+  "Willkommen bei DartHub": "Welcome to DartHub",
   "Melde dich an, um Turniere und Training zu öffnen.": "Sign in to open tournaments and training.",
   "Zuschauer verwenden den Zuschauerlink des Turniers.": "Spectators use the tournament's spectator link.",
   "E-Mail": "Email",
@@ -491,8 +491,8 @@
   "Walk-on zufällig · Musik, Effekte und Ansagen unabhängig": "Random walk-on · Independent music, effects and calls",
   "Bitte auswählen": "Please select",
   "Meldung schließen": "Dismiss message",
-  "Dartbracket / Freunde": "Dartbracket / Friends",
-  "Dartbracket / Training": "Dartbracket / Training",
+  "DartHub / Freunde": "DartHub / Friends",
+  "DartHub / Training": "DartHub / Training",
   "Du bist als": "You are signed in as",
   "angemeldet.": ".",
   "Spielen": "Play",
@@ -973,5 +973,8 @@
   "Gesamtzeit mit Uhrabgleich geschätzt. Messunsicherheit etwa": "Total estimated with clock synchronization. Approximate uncertainty",
   "Handy-Zeit enthält die KI-Auswertung bereits.": "Phone time already includes AI inference.",
   "Messwerte kopiert": "Measurements copied",
-  "Messwerte kopieren": "Copy measurements"
+  "Messwerte kopieren": "Copy measurements",
+  "Wird als „{0}“ gespeichert.": "Will be saved as “{0}”.",
+  "Bitte einen Kameranamen eingeben.": "Please enter a camera name.",
+  "Du hast bereits eine Kamera mit diesem Namen. Bitte wähle einen anderen Namen.": "You already have a camera with this name. Please choose a different name."
 }
